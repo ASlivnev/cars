@@ -1,0 +1,80 @@
+using UnityEngine;
+
+// Повесить на тот же объект, где PrometeoCarController. Нитро прибавляет скорость напрямую
+// через Rigidbody, в обход системы газа/maxSpeed контроллера - поэтому машина может
+// разогнаться выше своего обычного потолка скорости.
+[RequireComponent(typeof(PrometeoCarController))]
+[RequireComponent(typeof(Rigidbody))]
+public class CarNitro : MonoBehaviour
+{
+    [Tooltip("Клавиша активации нитро")]
+    public KeyCode activateKey = KeyCode.Q;
+    [Tooltip("На сколько км/ч суммарно разгоняет нитро за всё время работы")]
+    public float speedBoost = 100f;
+    [Tooltip("За сколько секунд нитро разгоняет машину на speedBoost")]
+    public float boostDuration = 1f;
+    [Tooltip("Система частиц (выхлоп/пламя) - играет всё время, пока активно нитро, и останавливается, когда нитро заканчивается")]
+    [SerializeField] ParticleSystem nitroEffect;
+
+    PrometeoCarController car;
+    Rigidbody rb;
+
+    bool isBoosting;
+    float boostTimer;
+
+    void Awake()
+    {
+        car = GetComponent<PrometeoCarController>();
+        rb = GetComponent<Rigidbody>();
+    }
+
+    void Update()
+    {
+        if(!isBoosting && car.enabled && Input.GetKeyDown(activateKey)){
+            StartBoost();
+        }
+    }
+
+    void FixedUpdate()
+    {
+        if(!isBoosting) return;
+
+        // Машина могла умереть (car.enabled = false в CarHealth.Die()) прямо во время разгона -
+        // тогда нитро нужно оборвать, а не продолжать толкать уже неуправляемый обломок.
+        if(!car.enabled){
+            StopBoost();
+            return;
+        }
+
+        // Постоянное ускорение (ForceMode.Acceleration игнорирует массу) даёт ровно speedBoost
+        // км/ч суммарной прибавки к скорости за boostDuration секунд, независимо от массы машины
+        // и от частоты кадров - в отличие от одного импульса, растянуто по времени, поэтому
+        // разгон ощущается плавным, а не мгновенным рывком.
+        float accelerationMS2 = (speedBoost / 3.6f) / boostDuration;
+        rb.AddForce(transform.forward * accelerationMS2, ForceMode.Acceleration);
+
+        boostTimer -= Time.fixedDeltaTime;
+        if(boostTimer <= 0f){
+            StopBoost();
+        }
+    }
+
+    void StartBoost()
+    {
+        isBoosting = true;
+        boostTimer = boostDuration;
+
+        if(nitroEffect != null){
+            nitroEffect.Play();
+        }
+    }
+
+    void StopBoost()
+    {
+        isBoosting = false;
+
+        if(nitroEffect != null){
+            nitroEffect.Stop();
+        }
+    }
+}
