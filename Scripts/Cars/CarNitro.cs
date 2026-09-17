@@ -15,22 +15,28 @@ public class CarNitro : MonoBehaviour
     public float boostDuration = 1f;
     [Tooltip("Система частиц (выхлоп/пламя) - играет всё время, пока активно нитро, и останавливается, когда нитро заканчивается")]
     [SerializeField] ParticleSystem nitroEffect;
+    [Tooltip("AudioSource со звуком нитро - проигрывается, пока активно нитро, и останавливается, когда нитро заканчивается. Как и carEngineSound/tireScreechSound в PrometeoCarController, это AudioSource с уже назначенным в инспекторе AudioClip")]
+    [SerializeField] AudioSource nitroSound;
+    [Tooltip("Сколько раз за игру можно использовать нитро (0 - нельзя использовать вообще)")]
+    public int maxUses = 2;
 
     PrometeoCarController car;
     Rigidbody rb;
 
     bool isBoosting;
     float boostTimer;
+    int usesLeft;
 
     void Awake()
     {
         car = GetComponent<PrometeoCarController>();
         rb = GetComponent<Rigidbody>();
+        usesLeft = maxUses;
     }
 
     void Update()
     {
-        if(!isBoosting && car.enabled && Input.GetKeyDown(activateKey)){
+        if(!isBoosting && car.enabled && usesLeft > 0 && Input.GetKeyDown(activateKey)){
             StartBoost();
         }
     }
@@ -63,9 +69,13 @@ public class CarNitro : MonoBehaviour
     {
         isBoosting = true;
         boostTimer = boostDuration;
+        usesLeft--;
 
         if(nitroEffect != null){
             nitroEffect.Play();
+        }
+        if(nitroSound != null){
+            nitroSound.Play();
         }
     }
 
@@ -75,6 +85,9 @@ public class CarNitro : MonoBehaviour
 
         if(nitroEffect != null){
             nitroEffect.Stop();
+        }
+        if(nitroSound != null){
+            nitroSound.Stop();
         }
     }
 }
