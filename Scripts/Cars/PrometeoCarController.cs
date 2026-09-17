@@ -339,21 +339,21 @@ public class PrometeoCarController : MonoBehaviour
 
         }else{
 
-          if(Input.GetKey(KeyCode.W)){
+          if(Input.GetKey(KeyCode.UpArrow)){
             CancelInvoke("DecelerateCar");
             deceleratingCar = false;
             GoForward();
           }
-          if(Input.GetKey(KeyCode.S)){
+          if(Input.GetKey(KeyCode.DownArrow)){
             CancelInvoke("DecelerateCar");
             deceleratingCar = false;
             GoReverse();
           }
 
-          if(Input.GetKey(KeyCode.A)){
+          if(Input.GetKey(KeyCode.LeftArrow)){
             TurnLeft();
           }
-          if(Input.GetKey(KeyCode.D)){
+          if(Input.GetKey(KeyCode.RightArrow)){
             TurnRight();
           }
           if(Input.GetKey(KeyCode.Space)){
@@ -364,14 +364,14 @@ public class PrometeoCarController : MonoBehaviour
           if(Input.GetKeyUp(KeyCode.Space)){
             RecoverTraction();
           }
-          if((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W))){
+          if((!Input.GetKey(KeyCode.DownArrow) && !Input.GetKey(KeyCode.UpArrow))){
             ThrottleOff();
           }
-          if((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W)) && !Input.GetKey(KeyCode.Space) && !deceleratingCar){
+          if((!Input.GetKey(KeyCode.DownArrow) && !Input.GetKey(KeyCode.UpArrow)) && !Input.GetKey(KeyCode.Space) && !deceleratingCar){
             InvokeRepeating("DecelerateCar", 0f, 0.1f);
             deceleratingCar = true;
           }
-          if(!Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D) && steeringAxis != 0f){
+          if(!Input.GetKey(KeyCode.LeftArrow) && !Input.GetKey(KeyCode.RightArrow) && steeringAxis != 0f){
             ResetSteeringAngle();
           }
 
