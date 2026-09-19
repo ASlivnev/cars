@@ -5901,6 +5901,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 5004334079889704560, guid: 26237147d17eb4d12819c333aee45887, type: 3}
+      propertyPath: maxAmmo
+      value: 100
+      objectReference: {fileID: 0}
     - target: {fileID: 5280127266097313285, guid: 26237147d17eb4d12819c333aee45887, type: 3}
       propertyPath: minDamageSpeed
       value: 20
