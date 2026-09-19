@@ -176,7 +176,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7114e8c52c3e248818fa2e23741b615c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarMine
-  ownerRoot: {fileID: 0}
+  armDelay: 0.1
   damagePercent: 0
   explosionEffectPrefab: {fileID: 0}
   explosionSound: {fileID: 7937694768603336344}
