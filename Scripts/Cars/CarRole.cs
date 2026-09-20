@@ -17,21 +17,53 @@ public class CarRole : MonoBehaviour
     [Tooltip("Имя объекта в сцене с UI Text спидометра - используется только для автопоиска (см. Awake), если Is Player включён, а Car Speed Text у PrometeoCarController не назначен вручную")]
     public string speedTextObjectName = "Speed Text";
 
+    [Header("Опциональное вооружение")]
+    [Tooltip("Включить нитро (форсаж) на этой машине")]
+    public bool enableNitro = true;
+    [Tooltip("Включить пулемёты на этой машине")]
+    public bool enableMachineGuns = true;
+    [Tooltip("Включить мины на этой машине")]
+    public bool enableMines = true;
+    [Tooltip("Объекты (например, стволы пулемётов на модели машины), которые нужно скрыть, если Enable Machine Guns выключен")]
+    public GameObject[] hideWhenMachineGunsDisabled;
+
     PrometeoCarController car;
 
     void Awake()
     {
         car = GetComponent<PrometeoCarController>();
 
-        // Оружие, нитро и мины остаются включёнными у обеих ролей - пока их использует только
-        // игрок через клавиши (EnemyCarAI их не нажимает), но компоненты не выключаем, чтобы
-        // потом можно было научить EnemyCarAI ими пользоваться, не трогая этот скрипт.
-        //
         // EnemyCarAI сам переключает PrometeoCarController.isPlayerControlled в false в своём
         // Start() - тут достаточно только включить/выключить сам компонент.
         EnemyCarAI ai = GetComponent<EnemyCarAI>();
         if(ai != null){
             ai.enabled = !isPlayer;
+        }
+
+        // Вооружение опционально и не зависит от роли (isPlayer) - можно, например, сделать
+        // безоружного противника или безоружного игрока. Компоненты не удаляем, а выключаем -
+        // EnemyCarAI при попытке им воспользоваться просто увидит null/выключенный компонент.
+        CarNitro nitro = GetComponent<CarNitro>();
+        if(nitro != null){
+            nitro.enabled = enableNitro;
+        }
+
+        CarMachineGuns guns = GetComponent<CarMachineGuns>();
+        if(guns != null){
+            guns.enabled = enableMachineGuns;
+        }
+
+        if(!enableMachineGuns){
+            foreach(GameObject obj in hideWhenMachineGunsDisabled){
+                if(obj != null){
+                    obj.SetActive(false);
+                }
+            }
+        }
+
+        CarMineDropper mineDropper = GetComponent<CarMineDropper>();
+        if(mineDropper != null){
+            mineDropper.enabled = enableMines;
         }
 
         // useUI/carSpeedText на префабе рассчитаны на одного игрока: useUI=true, но carSpeedText

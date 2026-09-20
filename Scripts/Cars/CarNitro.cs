@@ -50,7 +50,10 @@ public class CarNitro : MonoBehaviour
     // машина жива, остались использования).
     public void TryActivate()
     {
-        if(isBoosting || !car.enabled || usesLeft <= 0) return;
+        // enabled - на случай, если этот компонент выключен через CarRole (опциональное
+        // вооружение). Вызов публичного метода не блокируется выключенным компонентом сам по
+        // себе (это влияет только на автоматические Update/FixedUpdate), поэтому проверяем сами.
+        if(!enabled || isBoosting || !car.enabled || usesLeft <= 0) return;
         StartBoost();
     }
 

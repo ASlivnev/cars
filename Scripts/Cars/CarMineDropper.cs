@@ -56,7 +56,10 @@ public class CarMineDropper : MonoBehaviour
     // ботов. Сама проверяет, остались ли патроны мин и жива ли машина.
     public void TryDropMine()
     {
-        if(!car.enabled || minesLeft <= 0) return;
+        // enabled - на случай, если этот компонент выключен через CarRole (опциональное
+        // вооружение). Вызов публичного метода не блокируется выключенным компонентом сам по
+        // себе (это влияет только на автоматические Update/FixedUpdate), поэтому проверяем сами.
+        if(!enabled || !car.enabled || minesLeft <= 0) return;
         DropMine();
     }
 

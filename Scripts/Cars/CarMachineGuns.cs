@@ -63,7 +63,10 @@ public class CarMachineGuns : MonoBehaviour
     // как при обычном удержании кнопки.
     public void TryFire()
     {
-        if(!car.enabled || fireTimer > 0f || ammoLeft <= 0) return;
+        // enabled - на случай, если этот компонент выключен через CarRole (опциональное
+        // вооружение). Вызов публичного метода не блокируется выключенным компонентом сам по
+        // себе (это влияет только на автоматические Update/FixedUpdate), поэтому проверяем сами.
+        if(!enabled || !car.enabled || fireTimer > 0f || ammoLeft <= 0) return;
 
         fireTimer = 1f / shotsPerSecond;
         Fire();
