@@ -507,7 +507,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1aebf65a69ed8496a8e5b0d29876e214, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarRole
-  isEnemy: 0
+  isPlayer: 0
 --- !u!1 &836862370356882510
 GameObject:
   m_ObjectHideFlags: 0

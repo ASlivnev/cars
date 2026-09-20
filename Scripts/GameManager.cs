@@ -30,7 +30,7 @@ public class GameManager : MonoBehaviour
         if(winUI != null) winUI.SetActive(false);
 
         // Игрок и противники - один и тот же префаб (см. CarRole), поэтому машину игрока нельзя
-        // найти по типу компонентов - только по CarRole.isEnemy == false. Ищем сами, если ссылку
+        // найти по типу компонентов - только по CarRole.isPlayer == true. Ищем сами, если ссылку
         // не задали вручную в инспекторе.
         if(playerHealth == null){
             FindPlayerHealth();
@@ -47,10 +47,10 @@ public class GameManager : MonoBehaviour
             if(candidate == null) continue;
 
             // Компонент EnemyCarAI есть теперь у ВСЕХ машин, включая игрока (просто выключен) -
-            // проверять его наличие больше нельзя, нужна именно роль через CarRole.isEnemy,
+            // проверять его наличие больше нельзя, нужна именно роль через CarRole.isPlayer,
             // иначе игрок сам попадёт в список "противников".
             CarRole role = candidate.GetComponent<CarRole>();
-            if(role == null || !role.isEnemy) continue;
+            if(role == null || role.isPlayer) continue;
 
             CarHealth health = candidate.GetComponent<CarHealth>();
             if(health != null){
@@ -59,15 +59,15 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // См. комментарий в Start() - ищет среди всех машин на сцене ту, у которой CarRole.isEnemy
-    // == false (по той же логике, что и CameraFollow.FindPlayerCar).
+    // См. комментарий в Start() - ищет среди всех машин на сцене ту, у которой CarRole.isPlayer
+    // == true (по той же логике, что и CameraFollow.FindPlayerCar).
     void FindPlayerHealth()
     {
         foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
             if(candidate == null) continue;
 
             CarRole role = candidate.GetComponent<CarRole>();
-            if(role != null && role.isEnemy) continue;
+            if(role != null && !role.isPlayer) continue;
 
             CarHealth health = candidate.GetComponent<CarHealth>();
             if(health != null){

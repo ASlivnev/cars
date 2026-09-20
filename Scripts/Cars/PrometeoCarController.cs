@@ -388,13 +388,12 @@ public class PrometeoCarController : MonoBehaviour
     // This method converts the car speed data from float to string, and then set the text of the UI carSpeedText with this value.
     public void CarSpeedUI(){
 
-      if(useUI){
-          try{
-            float absoluteCarSpeed = Mathf.Abs(carSpeed);
-            carSpeedText.text = Mathf.RoundToInt(absoluteCarSpeed).ToString();
-          }catch(Exception ex){
-            Debug.LogWarning(ex);
-          }
+      // carSpeedText может быть не назначен (например, на противниках, которые используют тот же
+      // префаб, что и игрок, но не должны показывать спидометр) - раньше это кидало
+      // NullReferenceException каждые 0.1 сек (метод вызывается через InvokeRepeating).
+      if(useUI && carSpeedText != null){
+          float absoluteCarSpeed = Mathf.Abs(carSpeed);
+          carSpeedText.text = Mathf.RoundToInt(absoluteCarSpeed).ToString();
       }
 
     }
