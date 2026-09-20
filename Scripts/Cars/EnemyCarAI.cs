@@ -82,9 +82,23 @@ public class EnemyCarAI : MonoBehaviour
     [Tooltip("Угол (град.) между направлением машины и целью, в пределах которого цель считается 'на линии огня'")]
     public float fireAngleThreshold = 8f;
 
+    [Header("Форсаж (нитро) при таране")]
+    [Tooltip("Кулдаун (сек) между использованиями нитро для тарана")]
+    public float nitroCooldown = 15f;
+    [Tooltip("Вероятность (0-1), что при удачной возможности для тарана AI реально включит нитро - не каждый раз, чтобы это не выглядело как гарантированная реакция")]
+    [Range(0f, 1f)]
+    public float nitroUseChance = 0.5f;
+    [Tooltip("Минимальная дистанция до цели (метры) для использования нитро - вплотную разгоняться уже поздно и бессмысленно")]
+    public float nitroMinDistance = 10f;
+    [Tooltip("Максимальная дистанция до цели (метры) для использования нитро - слишком далеко, и цель успеет свернуть с курса за время разгона")]
+    public float nitroMaxDistance = 35f;
+    [Tooltip("Угол (град.) между направлением машины и целью, в пределах которого таран форсажем считается удачной возможностью")]
+    public float nitroAngleThreshold = 20f;
+
     PrometeoCarController car;
     Rigidbody rb;
     CarMachineGuns guns;
+    CarNitro nitro;
 
     Transform currentTarget;
     Rigidbody currentTargetRb;
@@ -114,6 +128,8 @@ public class EnemyCarAI : MonoBehaviour
     bool isBursting;
     float burstTimer;
 
+    float nitroCooldownTimer;
+
     // Реестр всех живых EnemyCarAI на карте - нужен, чтобы при выборе цели можно было
     // посчитать, сколько ботов уже атакует конкретную машину (см. CountAttackers).
     static readonly List<EnemyCarAI> AllEnemies = new List<EnemyCarAI>();
@@ -134,12 +150,14 @@ public class EnemyCarAI : MonoBehaviour
         car.isPlayerControlled = false;
         rb = GetComponent<Rigidbody>();
         guns = GetComponent<CarMachineGuns>();
+        nitro = GetComponent<CarNitro>();
         baseMaxSpeed = car.GetMaxSpeed();
         lastCheckPosition = transform.position;
         PickRandomTarget();
 
-        // Случайный старт кулдауна - чтобы все боты не открывали огонь синхронно в один момент.
+        // Случайный старт кулдаунов - чтобы все боты не открывали огонь/форсаж синхронно в один момент.
         shootCooldownTimer = Random.Range(shootCooldownMin, shootCooldownMax);
+        nitroCooldownTimer = Random.Range(0f, nitroCooldown);
     }
 
     void Update()
@@ -155,6 +173,7 @@ public class EnemyCarAI : MonoBehaviour
 
         UpdateRubberBanding();
         HandleShooting();
+        HandleNitroUsage();
 
         if(isReversing){
             HandleReverse();
@@ -327,6 +346,47 @@ public class EnemyCarAI : MonoBehaviour
 
         float angle = Vector3.Angle(transform.forward, toTarget);
         if(angle > fireAngleThreshold) return false;
+
+        if(Physics.Raycast(transform.position + Vector3.up * 0.5f, toTarget.normalized, out RaycastHit hit, distance)){
+            if(hit.transform.root != currentTarget.root) return false;
+        }
+
+        return true;
+    }
+
+    // Форсаж, как и стрельба, доступен не постоянно - раз в nitroCooldown секунд AI проверяет,
+    // есть ли удачная возможность для тарана, и с вероятностью nitroUseChance решает
+    // воспользоваться нитро. Кулдаун списывается независимо от результата монетки - иначе при
+    // неудачном броске AI пробовал бы снова в следующем же кадре, и вероятность 50/50 ничего
+    // не значила бы (за секунду набралось бы десятки попыток).
+    void HandleNitroUsage()
+    {
+        if(nitro == null || currentTarget == null) return;
+
+        nitroCooldownTimer -= Time.deltaTime;
+        if(nitroCooldownTimer > 0f) return;
+        if(!IsGoodRammingOpportunity()) return;
+
+        nitroCooldownTimer = nitroCooldown;
+
+        if(Random.value < nitroUseChance){
+            nitro.TryActivate();
+        }
+    }
+
+    // "Удачная возможность для тарана" - цель в разумном диапазоне дистанций (не вплотную, но и
+    // не так далеко, чтобы машина успела свернуть с курса за время разгона), почти прямо по
+    // курсу машины, и между нами нет препятствия - иначе AI на форсаже впечатался бы в стену.
+    bool IsGoodRammingOpportunity()
+    {
+        Vector3 toTarget = currentTarget.position - transform.position;
+        toTarget.y = 0f;
+
+        float distance = toTarget.magnitude;
+        if(distance < nitroMinDistance || distance > nitroMaxDistance) return false;
+
+        float angle = Vector3.Angle(transform.forward, toTarget);
+        if(angle > nitroAngleThreshold) return false;
 
         if(Physics.Raycast(transform.position + Vector3.up * 0.5f, toTarget.normalized, out RaycastHit hit, distance)){
             if(hit.transform.root != currentTarget.root) return false;
