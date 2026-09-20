@@ -46,17 +46,27 @@ public class CarMachineGuns : MonoBehaviour
     {
         if(!car.enabled) return;
 
-        // Input.GetKey* - это глобальный опрос клавиатуры, не привязанный к конкретному объекту.
-        // Этот же компонент включён и у противников (см. CarRole) - без проверки isPlayerControlled
-        // удержание ЛКМ игроком одновременно открывало бы огонь со всех машин сразу.
-        if(!car.isPlayerControlled) return;
-
         fireTimer -= Time.deltaTime;
 
-        if(Input.GetKey(fireKey) && fireTimer <= 0f && ammoLeft > 0){
-            fireTimer = 1f / shotsPerSecond;
-            Fire();
+        // Input.GetKey* - это глобальный опрос клавиатуры, не привязанный к конкретному объекту.
+        // Этот же компонент включён и у противников (см. CarRole) - без проверки isPlayerControlled
+        // удержание ЛКМ игроком одновременно открывало бы огонь со всех машин сразу. У противников
+        // стрельбой управляет EnemyCarAI через TryFire(), а не эта клавиша.
+        if(car.isPlayerControlled && Input.GetKey(fireKey)){
+            TryFire();
         }
+    }
+
+    // Публичный "спуск курка" на один кадр - используется и игроком (через Update() выше), и
+    // EnemyCarAI для ботов. Сам разбирается, можно ли стрелять прямо сейчас (боеприпасы,
+    // скорострельность), поэтому вызывающему достаточно звать этот метод, пока хочет стрелять,
+    // как при обычном удержании кнопки.
+    public void TryFire()
+    {
+        if(!car.enabled || fireTimer > 0f || ammoLeft <= 0) return;
+
+        fireTimer = 1f / shotsPerSecond;
+        Fire();
     }
 
     void Fire()

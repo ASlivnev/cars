@@ -490,6 +490,11 @@ MonoBehaviour:
   clumpRetreatChance: 0.5
   clumpRetreatDistance: 15
   clumpRetreatTimeout: 4
+  shootCooldownMin: 1
+  shootCooldownMax: 5
+  burstDuration: 1
+  fireRange: 60
+  fireAngleThreshold: 8
 --- !u!114 &1570836716014493957
 MonoBehaviour:
   m_ObjectHideFlags: 0

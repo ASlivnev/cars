@@ -70,8 +70,21 @@ public class EnemyCarAI : MonoBehaviour
     [Tooltip("Максимальное время на сам манёвр отъезда - если что-то мешает отъехать на нужное расстояние (например, стена), всё равно прерываем по таймауту")]
     public float clumpRetreatTimeout = 4f;
 
+    [Header("Стрельба из пулемёта")]
+    [Tooltip("Минимальный кулдаун (сек) между очередями - AI не стреляет непрерывно, конкретное значение каждый раз выбирается случайно между Min и Max")]
+    public float shootCooldownMin = 10f;
+    [Tooltip("Максимальный кулдаун (сек) между очередями")]
+    public float shootCooldownMax = 15f;
+    [Tooltip("Как долго (сек) держится нажатым курок за одну очередь")]
+    public float burstDuration = 1f;
+    [Tooltip("Максимальная дистанция до цели, на которой AI вообще пытается стрелять")]
+    public float fireRange = 60f;
+    [Tooltip("Угол (град.) между направлением машины и целью, в пределах которого цель считается 'на линии огня'")]
+    public float fireAngleThreshold = 8f;
+
     PrometeoCarController car;
     Rigidbody rb;
+    CarMachineGuns guns;
 
     Transform currentTarget;
     Rigidbody currentTargetRb;
@@ -97,6 +110,10 @@ public class EnemyCarAI : MonoBehaviour
     Vector3 retreatStartPosition;
     float retreatManeuverTimer;
 
+    float shootCooldownTimer;
+    bool isBursting;
+    float burstTimer;
+
     // Реестр всех живых EnemyCarAI на карте - нужен, чтобы при выборе цели можно было
     // посчитать, сколько ботов уже атакует конкретную машину (см. CountAttackers).
     static readonly List<EnemyCarAI> AllEnemies = new List<EnemyCarAI>();
@@ -116,9 +133,13 @@ public class EnemyCarAI : MonoBehaviour
         car = GetComponent<PrometeoCarController>();
         car.isPlayerControlled = false;
         rb = GetComponent<Rigidbody>();
+        guns = GetComponent<CarMachineGuns>();
         baseMaxSpeed = car.GetMaxSpeed();
         lastCheckPosition = transform.position;
         PickRandomTarget();
+
+        // Случайный старт кулдауна - чтобы все боты не открывали огонь синхронно в один момент.
+        shootCooldownTimer = Random.Range(shootCooldownMin, shootCooldownMax);
     }
 
     void Update()
@@ -133,6 +154,7 @@ public class EnemyCarAI : MonoBehaviour
         }
 
         UpdateRubberBanding();
+        HandleShooting();
 
         if(isReversing){
             HandleReverse();
@@ -261,6 +283,56 @@ public class EnemyCarAI : MonoBehaviour
         targetPoint += new Vector3(aimError.x, 0f, aimError.y);
 
         perceivedTargetPoint = targetPoint;
+    }
+
+    // Стрельба отдельна от манёвров тарана - AI не палит непрерывно, а раз в случайные
+    // shootCooldownMin..shootCooldownMax секунд решает открыть короткую очередь длиной
+    // burstDuration, если в этот момент цель на линии огня. Работает независимо от того,
+    // едет ли машина вперёд, отъезжает от кучи или сдаёт назад (см. вызов в Update()).
+    void HandleShooting()
+    {
+        if(guns == null || currentTarget == null) return;
+
+        if(isBursting){
+            if(IsTargetInLineOfFire()){
+                guns.TryFire();
+            }
+
+            burstTimer -= Time.deltaTime;
+            if(burstTimer <= 0f){
+                isBursting = false;
+                shootCooldownTimer = Random.Range(shootCooldownMin, shootCooldownMax);
+            }
+            return;
+        }
+
+        shootCooldownTimer -= Time.deltaTime;
+        if(shootCooldownTimer <= 0f && IsTargetInLineOfFire()){
+            isBursting = true;
+            burstTimer = burstDuration;
+            guns.TryFire();
+        }
+    }
+
+    // Цель "на линии огня", если она в пределах fireRange, в пределах угла fireAngleThreshold
+    // от направления машины, и между машиной и целью нет препятствия (стены/другой машины) -
+    // иначе бот открывал бы огонь в стену или в спину случайно проезжающему мимо сопернику.
+    bool IsTargetInLineOfFire()
+    {
+        Vector3 toTarget = currentTarget.position - transform.position;
+        toTarget.y = 0f;
+
+        float distance = toTarget.magnitude;
+        if(distance > fireRange || distance < 0.01f) return false;
+
+        float angle = Vector3.Angle(transform.forward, toTarget);
+        if(angle > fireAngleThreshold) return false;
+
+        if(Physics.Raycast(transform.position + Vector3.up * 0.5f, toTarget.normalized, out RaycastHit hit, distance)){
+            if(hit.transform.root != currentTarget.root) return false;
+        }
+
+        return true;
     }
 
     // Три луча (центр, слева, справа) впереди машины. Если центр упирается в препятствие -
