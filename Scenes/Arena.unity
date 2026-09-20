@@ -5755,6 +5755,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SportCar
       objectReference: {fileID: 0}
+    - target: {fileID: 1570836716014493957, guid: 26237147d17eb4d12819c333aee45887, type: 3}
+      propertyPath: isPlayer
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5994,7 +5998,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 261786959625234688, guid: 26237147d17eb4d12819c333aee45887, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 8.803183
+      value: 3.5
       objectReference: {fileID: 0}
     - target: {fileID: 261786959625234688, guid: 26237147d17eb4d12819c333aee45887, type: 3}
       propertyPath: m_LocalPosition.y
@@ -6002,7 +6006,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 261786959625234688, guid: 26237147d17eb4d12819c333aee45887, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -22.48353
+      value: 10.5
       objectReference: {fileID: 0}
     - target: {fileID: 261786959625234688, guid: 26237147d17eb4d12819c333aee45887, type: 3}
       propertyPath: m_LocalRotation.w

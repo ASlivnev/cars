@@ -95,10 +95,22 @@ public class EnemyCarAI : MonoBehaviour
     [Tooltip("Угол (град.) между направлением машины и целью, в пределах которого таран форсажем считается удачной возможностью")]
     public float nitroAngleThreshold = 20f;
 
+    [Header("Мины от преследователя сзади")]
+    [Tooltip("Кулдаун (сек) между установками мины")]
+    public float mineDropCooldown = 10f;
+    [Tooltip("Вероятность (0-1), что при обнаружении преследователя сзади AI реально поставит мину")]
+    [Range(0f, 1f)]
+    public float mineDropChance = 0.5f;
+    [Tooltip("Максимальная дистанция сзади (метры), на которой другая машина считается 'пристроившейся сзади'")]
+    public float tailgateCheckDistance = 12f;
+    [Tooltip("Угол (град.) от направления строго назад, в пределах которого машина сзади считается преследователем (а не просто едущей мимо сбоку). 40 - довольно узкий конус: на короткой дистанции даже небольшое смещение в сторону от идеальной линии уже даёт большой угол, поэтому по умолчанию сделан шире")]
+    public float tailgateAngleThreshold = 75f;
+
     PrometeoCarController car;
     Rigidbody rb;
     CarMachineGuns guns;
     CarNitro nitro;
+    CarMineDropper mineDropper;
 
     Transform currentTarget;
     Rigidbody currentTargetRb;
@@ -130,6 +142,8 @@ public class EnemyCarAI : MonoBehaviour
 
     float nitroCooldownTimer;
 
+    float mineDropCooldownTimer;
+
     // Реестр всех живых EnemyCarAI на карте - нужен, чтобы при выборе цели можно было
     // посчитать, сколько ботов уже атакует конкретную машину (см. CountAttackers).
     static readonly List<EnemyCarAI> AllEnemies = new List<EnemyCarAI>();
@@ -151,13 +165,16 @@ public class EnemyCarAI : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         guns = GetComponent<CarMachineGuns>();
         nitro = GetComponent<CarNitro>();
+        mineDropper = GetComponent<CarMineDropper>();
         baseMaxSpeed = car.GetMaxSpeed();
         lastCheckPosition = transform.position;
         PickRandomTarget();
 
-        // Случайный старт кулдаунов - чтобы все боты не открывали огонь/форсаж синхронно в один момент.
+        // Случайный старт кулдаунов - чтобы все боты не открывали огонь/форсаж/мины синхронно
+        // в один момент.
         shootCooldownTimer = Random.Range(shootCooldownMin, shootCooldownMax);
         nitroCooldownTimer = Random.Range(0f, nitroCooldown);
+        mineDropCooldownTimer = Random.Range(0f, mineDropCooldown);
     }
 
     void Update()
@@ -174,6 +191,7 @@ public class EnemyCarAI : MonoBehaviour
         UpdateRubberBanding();
         HandleShooting();
         HandleNitroUsage();
+        HandleMineDropping();
 
         if(isReversing){
             HandleReverse();
@@ -393,6 +411,79 @@ public class EnemyCarAI : MonoBehaviour
         }
 
         return true;
+    }
+
+    // Мина, как и стрельба/форсаж, доступна не постоянно - раз в mineDropCooldown секунд AI
+    // проверяет, не пристроился ли кто-то сзади, и с вероятностью mineDropChance решает
+    // сбросить мину. Кулдаун списывается независимо от результата монетки - иначе при неудаче
+    // AI пробовал бы снова в следующем же кадре, и вероятность 50/50 ничего не значила бы.
+    void HandleMineDropping()
+    {
+        if(mineDropper == null) return;
+
+        mineDropCooldownTimer -= Time.deltaTime;
+        if(mineDropCooldownTimer > 0f) return;
+        if(!IsSomeoneTailgating()) return;
+
+        mineDropCooldownTimer = mineDropCooldown;
+
+        // ВРЕМЕННЫЙ диагностический лог - удалить после того, как разберёмся, почему боты не
+        // ставят мины от преследователя.
+        bool willDrop = Random.value < mineDropChance;
+        Debug.Log($"[EnemyCarAI] {gameObject.name}: обнаружен преследователь сзади, minesLeft={mineDropper.minesLeft}, монетка={(willDrop ? "ставим мину" : "пропускаем")}", this);
+
+        if(willDrop){
+            mineDropper.TryDropMine();
+        }
+    }
+
+    // Ищет ЛЮБУЮ живую машину (не только currentTarget - от преследователя надо отбиваться
+    // независимо от того, кого AI сейчас таранит), которая находится в узком секторе позади
+    // машины и достаточно близко - именно "пристроилась в хвост", а не просто едет мимо сбоку.
+    float debugTailgateLogTimer;
+
+    bool IsSomeoneTailgating()
+    {
+        float bestDistance = float.MaxValue;
+        float bestAngle = float.MaxValue;
+
+        foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+            if(candidate == null || candidate.transform == transform) continue;
+
+            CarHealth health = candidate.GetComponent<CarHealth>();
+            if(health != null && health.isDead) continue;
+
+            Vector3 toOther = candidate.transform.position - transform.position;
+            toOther.y = 0f;
+
+            float distance = toOther.magnitude;
+            if(distance < 0.01f) continue;
+
+            float angleFromBehind = Vector3.Angle(-transform.forward, toOther);
+
+            // Запоминаем ближайшего по углу кандидата - для диагностики ниже, вне зависимости
+            // от того, прошёл ли он пороги.
+            if(angleFromBehind < bestAngle){
+                bestAngle = angleFromBehind;
+                bestDistance = distance;
+            }
+
+            if(distance <= tailgateCheckDistance && angleFromBehind <= tailgateAngleThreshold){
+                return true;
+            }
+        }
+
+        // ВРЕМЕННЫЙ диагностический лог (раз в секунду, чтобы не спамить) - показывает, почему
+        // ближайший потенциальный "преследователь" не проходит пороги dist/angle.
+        debugTailgateLogTimer -= Time.deltaTime;
+        if(debugTailgateLogTimer <= 0f){
+            debugTailgateLogTimer = 1f;
+            if(bestAngle < float.MaxValue){
+                Debug.Log($"[EnemyCarAI] {gameObject.name}: ближайший по углу кандидат сзади - distance={bestDistance:F1} (порог {tailgateCheckDistance}), angle={bestAngle:F1} (порог {tailgateAngleThreshold})", this);
+            }
+        }
+
+        return false;
     }
 
     // Три луча (центр, слева, справа) впереди машины. Если центр упирается в препятствие -
