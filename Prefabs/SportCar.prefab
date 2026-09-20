@@ -424,7 +424,7 @@ MonoBehaviour:
   fireKey: 119
   leftGunPoint: {fileID: 8135001229427782941}
   rightGunPoint: {fileID: 3826053595489367992}
-  maxAmmo: 200
+  maxAmmo: 100
   shotsPerSecond: 8
   bulletRange: 60
   bulletSpeed: 120
@@ -450,6 +450,7 @@ MonoBehaviour:
   explosionEffect: {fileID: 1121192042590650, guid: e1b08032bec16ba4eb1ae23cbd572664, type: 3}
   dropSound: {fileID: 7588378092308559638}
   maxMines: 3
+  obstacleLayerChance: 0.5
   minesLeft: 0
 --- !u!114 &8155593572613023752
 MonoBehaviour:

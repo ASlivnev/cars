@@ -78,6 +78,8 @@ public class CarMachineGuns : MonoBehaviour
             ? Instantiate(bulletPrefab, firePoint.position, firePoint.rotation)
             : CreateFallbackBullet(firePoint);
 
+        StripPhysicsComponents(bulletObj);
+
         CarBullet bullet = bulletObj.GetComponent<CarBullet>();
         if(bullet == null) bullet = bulletObj.AddComponent<CarBullet>();
 
@@ -94,17 +96,26 @@ public class CarMachineGuns : MonoBehaviour
         GameObject bulletObj = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         bulletObj.transform.SetPositionAndRotation(firePoint.position, firePoint.rotation * Quaternion.Euler(90f, 0f, 0f));
         bulletObj.transform.localScale = new Vector3(0.05f, 0.15f, 0.05f);
-
-        // Коллайдер не нужен - попадание считает CarBullet через Physics.Raycast, а не через
-        // физическое столкновение. Важно: Destroy() удаляет компонент только в конце кадра, а
-        // пуля спавнится вплотную к корпусу машины (и физически пересекается с её же коллайдером
-        // в момент создания) - пока коллайдер ещё жив, физика успевает "вытолкнуть" пересекающиеся
-        // объекты друг из друга, и машина при каждом выстреле дёргается назад, как от отдачи.
-        // enabled = false отключает коллайдер мгновенно, до следующего шага физики.
-        Collider bulletCollider = bulletObj.GetComponent<Collider>();
-        bulletCollider.enabled = false;
-        Destroy(bulletCollider);
-
         return bulletObj;
+    }
+
+    // Пуля движется и наносит урон вручную через CarBullet (Physics.Raycast), поэтому Collider
+    // и Rigidbody ей не нужны - ни на заглушке, ни на пользовательском bulletPrefab. Важно не
+    // просто их игнорировать, а именно убрать: пуля спавнится вплотную к корпусу машины (точка
+    // вылета стоит на капоте) и физически пересекается с её же коллайдером в момент создания.
+    // Пока чужой коллайдер жив хотя бы один физический шаг, PhysX "выталкивает" пересекающиеся
+    // объекты друг из друга - а так как у пули нет Rigidbody, весь этот импульс достаётся машине,
+    // из-за чего газ/руль глохнут при каждом выстреле. Destroy() удаляет компонент только в конце
+    // кадра, поэтому сначала выключаем коллайдер мгновенно (enabled = false), а Destroy() потом
+    // просто подчищает компонент за ненадобностью - тот же приём, что и в CarHealth.CleanupWreck().
+    void StripPhysicsComponents(GameObject bulletObj)
+    {
+        foreach(Collider col in bulletObj.GetComponentsInChildren<Collider>()){
+            col.enabled = false;
+            Destroy(col);
+        }
+        foreach(Rigidbody rb in bulletObj.GetComponentsInChildren<Rigidbody>()){
+            Destroy(rb);
+        }
     }
 }

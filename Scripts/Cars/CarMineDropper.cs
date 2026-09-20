@@ -25,6 +25,10 @@ public class CarMineDropper : MonoBehaviour
     [Tooltip("Сколько мин за игру можно поставить (0 - нельзя ставить вообще)")]
     public int maxMines = 3;
 
+    [Tooltip("Вероятность (0-1), что поставленная мина получит слой Obstacles - EnemyCarAI объезжает препятствия на этом слое (см. obstacleAvoidMask), поэтому такую мину боты будут стараться объехать, а не переехать в лоб")]
+    [Range(0f, 1f)]
+    public float obstacleLayerChance = 0.5f;
+
     public int minesLeft;
 
     PrometeoCarController car;
@@ -66,8 +70,36 @@ public class CarMineDropper : MonoBehaviour
         mine.damagePercent = damagePercent;
         mine.explosionEffectPrefab = explosionEffect;
 
+        ApplyRandomObstacleLayer(mineObj);
+
         if(dropSound != null){
             dropSound.Play();
+        }
+    }
+
+    // С вероятностью obstacleLayerChance переводит мину на слой Obstacles - EnemyCarAI по
+    // умолчанию объезжает всё, что его лучи видят в obstacleAvoidMask (см. IsRealObstacle), но
+    // мина стоит на земле на своём обычном слое и туда не попадает. Слой выставляем не только на
+    // корневой объект, а рекурсивно на все дочерние - Physics.Raycast фильтрует по слою именно
+    // того GameObject, на котором висит задетый коллайдер, а не по слою корня.
+    void ApplyRandomObstacleLayer(GameObject mineObj)
+    {
+        if(Random.value >= obstacleLayerChance) return;
+
+        int obstaclesLayer = LayerMask.NameToLayer("Obstacles");
+        if(obstaclesLayer == -1){
+            Debug.LogWarning("CarMineDropper: слой \"Obstacles\" не найден в проекте (Edit > Project Settings > Tags and Layers) - не могу перевести мину на этот слой.", this);
+            return;
+        }
+
+        SetLayerRecursively(mineObj.transform, obstaclesLayer);
+    }
+
+    static void SetLayerRecursively(Transform root, int layer)
+    {
+        root.gameObject.layer = layer;
+        foreach(Transform child in root){
+            SetLayerRecursively(child, layer);
         }
     }
 
