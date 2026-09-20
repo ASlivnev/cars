@@ -46,6 +46,11 @@ public class CarMachineGuns : MonoBehaviour
     {
         if(!car.enabled) return;
 
+        // Input.GetKey* - это глобальный опрос клавиатуры, не привязанный к конкретному объекту.
+        // Этот же компонент включён и у противников (см. CarRole) - без проверки isPlayerControlled
+        // удержание ЛКМ игроком одновременно открывало бы огонь со всех машин сразу.
+        if(!car.isPlayerControlled) return;
+
         fireTimer -= Time.deltaTime;
 
         if(Input.GetKey(fireKey) && fireTimer <= 0f && ammoLeft > 0){

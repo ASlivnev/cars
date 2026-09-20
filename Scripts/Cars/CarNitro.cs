@@ -36,6 +36,11 @@ public class CarNitro : MonoBehaviour
 
     void Update()
     {
+        // Input.GetKey* - это глобальный опрос клавиатуры, не привязанный к конкретному объекту.
+        // Этот же компонент включён и у противников (см. CarRole) - без проверки isPlayerControlled
+        // нажатие Q игроком одновременно активировало бы нитро на всех машинах сразу.
+        if(!car.isPlayerControlled) return;
+
         if(!isBoosting && car.enabled && usesLeft > 0 && Input.GetKeyDown(activateKey)){
             StartBoost();
         }

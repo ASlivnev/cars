@@ -198,8 +198,10 @@ GameObject:
   - component: {fileID: 6078529947125178101}
   - component: {fileID: 5004334079889704560}
   - component: {fileID: 7468381853422766290}
+  - component: {fileID: 8155593572613023752}
+  - component: {fileID: 1570836716014493957}
   m_Layer: 3
-  m_Name: Player
+  m_Name: SportCar
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -449,6 +451,57 @@ MonoBehaviour:
   dropSound: {fileID: 7588378092308559638}
   maxMines: 3
   minesLeft: 0
+--- !u!114 &8155593572613023752
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 642287924342879162}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 643ccb8c4d27b478bacd28dd8f78ef4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyCarAI
+  retargetInterval: 15
+  maxAttackersPerTarget: 2
+  separationRadius: 5
+  separationWeight: 0.8
+  obstacleCheckDistance: 8
+  obstacleSideOffset: 1.5
+  obstacleAvoidMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  sharpTurnAngle: 50
+  minSpeedForHandbrakeTurn: 20
+  reactionDelay: 0.15
+  aimErrorRadius: 1.5
+  rubberBandDistance: 40
+  maxSpeedBoostMultiplier: 1.3
+  rubberBandUpdateInterval: 1
+  stuckCheckInterval: 2
+  minMoveDistance: 3
+  reverseDuration: 1
+  reverseCooldown: 1.5
+  clumpCheckRadius: 6
+  clumpMinNearbyCars: 2
+  clumpTimeToReact: 15
+  clumpRetreatChance: 0.5
+  clumpRetreatDistance: 15
+  clumpRetreatTimeout: 4
+--- !u!114 &1570836716014493957
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 642287924342879162}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1aebf65a69ed8496a8e5b0d29876e214, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarRole
+  isEnemy: 0
 --- !u!1 &836862370356882510
 GameObject:
   m_ObjectHideFlags: 0

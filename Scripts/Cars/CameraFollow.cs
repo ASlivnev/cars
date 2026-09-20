@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour {
 
+	[Tooltip("Машина, за которой следит камера. Если не назначить вручную - камера сама найдёт машину игрока среди PrometeoCarController.AllCars (первую, у которой CarRole.isEnemy == false)")]
 	public Transform carTransform;
 	public PrometeoCarController carController;
 	[Range(1, 10)]
@@ -23,13 +24,39 @@ public class CameraFollow : MonoBehaviour {
 	Camera cam;
 
 	void Start(){
+		if(carTransform == null){
+			FindPlayerCar();
+		}
+
+		cam = GetComponent<Camera>();
+		if(carController == null && carTransform != null){
+			carController = carTransform.GetComponent<PrometeoCarController>();
+		}
+
+		if(carTransform == null){
+			Debug.LogWarning("CameraFollow: машина игрока не найдена на сцене (нет PrometeoCarController с CarRole.isEnemy == false)", this);
+			return;
+		}
+
 		initialCameraPosition = gameObject.transform.position;
 		initialCarPosition = carTransform.position;
 		absoluteInitCameraPosition = initialCameraPosition - initialCarPosition;
+	}
 
-		cam = GetComponent<Camera>();
-		if(carController == null){
-			carController = carTransform.GetComponent<PrometeoCarController>();
+	// Ищет машину игрока среди всех зарегистрированных машин на сцене - это первая, у которой
+	// НЕТ CarRole с isEnemy == true. CarRole стоит на общем префабе машины (см. CarRole.cs),
+	// поэтому именно эта галочка теперь отличает игрока от ботов, без ручного перетаскивания
+	// ссылки на конкретный объект в инспекторе камеры.
+	void FindPlayerCar(){
+		foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+			if(candidate == null) continue;
+
+			CarRole role = candidate.GetComponent<CarRole>();
+			if(role != null && role.isEnemy) continue;
+
+			carTransform = candidate.transform;
+			carController = candidate;
+			return;
 		}
 	}
 

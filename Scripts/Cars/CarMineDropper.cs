@@ -39,6 +39,11 @@ public class CarMineDropper : MonoBehaviour
     {
         if(!car.enabled) return;
 
+        // Input.GetKey* - это глобальный опрос клавиатуры, не привязанный к конкретному объекту.
+        // Этот же компонент включён и у противников (см. CarRole) - без проверки isPlayerControlled
+        // нажатие F игроком одновременно ставило бы мину со всех машин сразу.
+        if(!car.isPlayerControlled) return;
+
         if(minesLeft > 0 && Input.GetKeyDown(dropKey)){
             DropMine();
         }

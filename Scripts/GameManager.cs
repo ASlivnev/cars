@@ -29,6 +29,13 @@ public class GameManager : MonoBehaviour
         if(loseUI != null) loseUI.SetActive(false);
         if(winUI != null) winUI.SetActive(false);
 
+        // Игрок и противники - один и тот же префаб (см. CarRole), поэтому машину игрока нельзя
+        // найти по типу компонентов - только по CarRole.isEnemy == false. Ищем сами, если ссылку
+        // не задали вручную в инспекторе.
+        if(playerHealth == null){
+            FindPlayerHealth();
+        }
+
         // Запоминаем противников СЕЙЧАС, пока никто ещё не умер. CarHealth.Die() отключает
         // PrometeoCarController (car.enabled = false), а у него на OnDisable() машина
         // удаляется из PrometeoCarController.AllCars - то есть погибшие противники полностью
@@ -37,11 +44,35 @@ public class GameManager : MonoBehaviour
         // в нём уже был бы пуст, и условие "все враги мертвы" никогда бы не сработало.
         trackedEnemies = new List<CarHealth>();
         foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
-            if(candidate == null || candidate.GetComponent<EnemyCarAI>() == null) continue;
+            if(candidate == null) continue;
+
+            // Компонент EnemyCarAI есть теперь у ВСЕХ машин, включая игрока (просто выключен) -
+            // проверять его наличие больше нельзя, нужна именно роль через CarRole.isEnemy,
+            // иначе игрок сам попадёт в список "противников".
+            CarRole role = candidate.GetComponent<CarRole>();
+            if(role == null || !role.isEnemy) continue;
 
             CarHealth health = candidate.GetComponent<CarHealth>();
             if(health != null){
                 trackedEnemies.Add(health);
+            }
+        }
+    }
+
+    // См. комментарий в Start() - ищет среди всех машин на сцене ту, у которой CarRole.isEnemy
+    // == false (по той же логике, что и CameraFollow.FindPlayerCar).
+    void FindPlayerHealth()
+    {
+        foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+            if(candidate == null) continue;
+
+            CarRole role = candidate.GetComponent<CarRole>();
+            if(role != null && role.isEnemy) continue;
+
+            CarHealth health = candidate.GetComponent<CarHealth>();
+            if(health != null){
+                playerHealth = health;
+                return;
             }
         }
     }
