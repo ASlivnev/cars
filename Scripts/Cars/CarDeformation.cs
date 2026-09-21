@@ -26,16 +26,45 @@ public class CarDeformation : MonoBehaviour
     void Start()
     {
         if(bodyMeshFilter == null){
-            bodyMeshFilter = GetComponentInChildren<MeshFilter>();
+            bodyMeshFilter = FindLikelyBodyMeshFilter();
         }
 
-        if(bodyMeshFilter != null){
-            // .mesh (а не .sharedMesh) сам делает уникальную копию под этот конкретный
-            // экземпляр - не портим общий ассет меша, используемый другими машинами.
-            mesh = bodyMeshFilter.mesh;
-            vertices = mesh.vertices;
-            originalVertices = (Vector3[])vertices.Clone();
+        if(bodyMeshFilter == null) return;
+
+        // Read/Write Enabled может быть выключен в настройках импорта модели (это дефолт для
+        // многих импортированных FBX) - тогда mesh.vertices кидает исключение. Вместо краха
+        // просто отключаем деформацию для этой машины и явно говорим, что нужно поправить.
+        if(bodyMeshFilter.sharedMesh == null || !bodyMeshFilter.sharedMesh.isReadable){
+            Debug.LogWarning($"CarDeformation: меш '{bodyMeshFilter.name}' нельзя читать в рантайме (Read/Write Enabled выключен в Import Settings этой модели) - деформация корпуса для этой машины отключена. Включите Read/Write Enabled на меше и нажмите Apply.", this);
+            return;
         }
+
+        // .mesh (а не .sharedMesh) сам делает уникальную копию под этот конкретный
+        // экземпляр - не портим общий ассет меша, используемый другими машинами.
+        mesh = bodyMeshFilter.mesh;
+        vertices = mesh.vertices;
+        originalVertices = (Vector3[])vertices.Clone();
+    }
+
+    // Если bodyMeshFilter не назначен вручную, среди всех MeshFilter в детях берём не первый
+    // попавшийся (это часто оказывается мелкая деталь вроде поворотника или зеркала), а тот,
+    // у кого самый большой bounds - эвристика "кузов обычно самый крупный меш на машине".
+    MeshFilter FindLikelyBodyMeshFilter()
+    {
+        MeshFilter best = null;
+        float bestSize = -1f;
+
+        foreach(MeshFilter candidate in GetComponentsInChildren<MeshFilter>()){
+            if(candidate.sharedMesh == null) continue;
+
+            float size = candidate.sharedMesh.bounds.size.sqrMagnitude;
+            if(size > bestSize){
+                bestSize = size;
+                best = candidate;
+            }
+        }
+
+        return best;
     }
 
     void OnCollisionEnter(Collision collision)
