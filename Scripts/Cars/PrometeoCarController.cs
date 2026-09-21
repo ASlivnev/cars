@@ -140,6 +140,7 @@ public class PrometeoCarController : MonoBehaviour
       float driftingAxis;
       float localVelocityZ;
       float localVelocityX;
+      float smoothedCarSpeed;
       bool deceleratingCar;
       bool touchControlsSetup = false;
       /*
@@ -279,11 +280,18 @@ public class PrometeoCarController : MonoBehaviour
       //CAR DATA
 
       // We determine the speed of the car.
-      carSpeed = (2 * Mathf.PI * frontLeftCollider.radius * frontLeftCollider.rpm * 60) / 1000;
+      // Скорость считаем по проекции физической скорости кузова на направление машины,
+      // а не по rpm одного колеса. rpm отдельного WheelCollider’а скачет при проскальзывании
+      // и отрыве от земли — из-за этого у тяжёлого грузовика спидометр и звук мотора
+      // постоянно «сбрасывались» вниз.
+      carSpeed = Vector3.Dot(carRigidbody.linearVelocity, transform.forward) * 3.6f;
       // Save the local velocity of the car in the x axis. Used to know if the car is drifting.
       localVelocityX = transform.InverseTransformDirection(carRigidbody.linearVelocity).x;
       // Save the local velocity of the car in the z axis. Used to know if the car is going forward or backwards.
       localVelocityZ = transform.InverseTransformDirection(carRigidbody.linearVelocity).z;
+
+      // Плавное сглаживание значения для UI, чтобы цифры не дёргались.
+      smoothedCarSpeed = Mathf.Lerp(smoothedCarSpeed, carSpeed, 12f * Time.deltaTime);
 
       //CAR PHYSICS
 
@@ -392,7 +400,7 @@ public class PrometeoCarController : MonoBehaviour
       // префаб, что и игрок, но не должны показывать спидометр) - раньше это кидало
       // NullReferenceException каждые 0.1 сек (метод вызывается через InvokeRepeating).
       if(useUI && carSpeedText != null){
-          float absoluteCarSpeed = Mathf.Abs(carSpeed);
+          float absoluteCarSpeed = Mathf.Abs(smoothedCarSpeed);
           carSpeedText.text = Mathf.RoundToInt(absoluteCarSpeed).ToString();
       }
 
@@ -530,25 +538,20 @@ public class PrometeoCarController : MonoBehaviour
       if(localVelocityZ < -1f){
         Brakes();
       }else{
-        if(Mathf.RoundToInt(carSpeed) < maxSpeed){
-          //Apply positive torque in all wheels to go forward if maxSpeed has not been reached.
-          frontLeftCollider.brakeTorque = 0;
-          frontLeftCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          frontRightCollider.brakeTorque = 0;
-          frontRightCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          rearLeftCollider.brakeTorque = 0;
-          rearLeftCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          rearRightCollider.brakeTorque = 0;
-          rearRightCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-        }else {
-          // If the maxSpeed has been reached, then stop applying torque to the wheels.
-          // IMPORTANT: The maxSpeed variable should be considered as an approximation; the speed of the car
-          // could be a bit higher than expected.
-    			frontLeftCollider.motorTorque = 0;
-    			frontRightCollider.motorTorque = 0;
-          rearLeftCollider.motorTorque = 0;
-    			rearRightCollider.motorTorque = 0;
-    		}
+        // Раньше тяга обрубалась резким скачком (100% -> 0%) ровно в момент пересечения
+        // maxSpeed - вместо этого плавно снижаем тягу на последних 20% разгона.
+        float taperStart = maxSpeed * 0.8f;
+        float torqueScale = 1f - Mathf.Clamp01((carSpeed - taperStart) / (maxSpeed - taperStart));
+        float torque = (accelerationMultiplier * 50f) * throttleAxis * torqueScale;
+
+        frontLeftCollider.brakeTorque = 0;
+        frontLeftCollider.motorTorque = torque;
+        frontRightCollider.brakeTorque = 0;
+        frontRightCollider.motorTorque = torque;
+        rearLeftCollider.brakeTorque = 0;
+        rearLeftCollider.motorTorque = torque;
+        rearRightCollider.brakeTorque = 0;
+        rearRightCollider.motorTorque = torque;
       }
     }
 
@@ -574,25 +577,20 @@ public class PrometeoCarController : MonoBehaviour
       if(localVelocityZ > 1f){
         Brakes();
       }else{
-        if(Mathf.Abs(Mathf.RoundToInt(carSpeed)) < maxReverseSpeed){
-          //Apply negative torque in all wheels to go in reverse if maxReverseSpeed has not been reached.
-          frontLeftCollider.brakeTorque = 0;
-          frontLeftCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          frontRightCollider.brakeTorque = 0;
-          frontRightCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          rearLeftCollider.brakeTorque = 0;
-          rearLeftCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-          rearRightCollider.brakeTorque = 0;
-          rearRightCollider.motorTorque = (accelerationMultiplier * 50f) * throttleAxis;
-        }else {
-          //If the maxReverseSpeed has been reached, then stop applying torque to the wheels.
-          // IMPORTANT: The maxReverseSpeed variable should be considered as an approximation; the speed of the car
-          // could be a bit higher than expected.
-    			frontLeftCollider.motorTorque = 0;
-    			frontRightCollider.motorTorque = 0;
-          rearLeftCollider.motorTorque = 0;
-    			rearRightCollider.motorTorque = 0;
-    		}
+        // См. комментарий в GoForward() - та же плавная отсечка тяги вместо резкого
+        // скачка 100% -> 0%, чтобы не было "качелей" на пороге maxReverseSpeed.
+        float taperStart = maxReverseSpeed * 0.8f;
+        float torqueScale = 1f - Mathf.Clamp01((Mathf.Abs(carSpeed) - taperStart) / (maxReverseSpeed - taperStart));
+        float torque = (accelerationMultiplier * 50f) * throttleAxis * torqueScale;
+
+        frontLeftCollider.brakeTorque = 0;
+        frontLeftCollider.motorTorque = torque;
+        frontRightCollider.brakeTorque = 0;
+        frontRightCollider.motorTorque = torque;
+        rearLeftCollider.brakeTorque = 0;
+        rearLeftCollider.motorTorque = torque;
+        rearRightCollider.brakeTorque = 0;
+        rearRightCollider.motorTorque = torque;
       }
     }
 

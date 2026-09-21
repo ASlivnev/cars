@@ -17,7 +17,7 @@ public class CarHealth : MonoBehaviour
     [Tooltip("Скорость (км/ч), при которой столкновение наносит 100% урона")]
     public float speedFor100PercentDamage = 200f;
     [Tooltip("Ниже этой скорости (км/ч) столкновение урона не наносит")]
-    public float minDamageSpeed = 5f;
+    public float minDamageSpeed = 2.5f;
     [Tooltip("Минимальный интервал между тиками урона от одного и того же соперника (сек) - чтобы урон не сыпался каждый кадр, пока машины прижаты друг к другу")]
     public float damageCooldown = 0.5f;
     [Tooltip("Слой препятствий (стены, отбойники и т.д.) - столкновение с ним наносит урон машине так же, как удар другой машиной")]

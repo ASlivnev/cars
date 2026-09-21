@@ -7,6 +7,8 @@ public class CameraFollow : MonoBehaviour {
 	[Tooltip("Машина, за которой следит камера. Если не назначить вручную - камера сама найдёт машину игрока среди PrometeoCarController.AllCars (первую, у которой CarRole.isPlayer == true)")]
 	public Transform carTransform;
 	public PrometeoCarController carController;
+	[Tooltip("Смещение камеры от машины в мировых осях (не поворачивается вместе с машиной). Раньше вместо этого поля бралась разница между стартовой позицией камеры В СЦЕНЕ и стартовой позицией машины - это работало только 'случайно', если камеру заранее вручную поставили рядом именно с той машиной, которая окажется игроком. Для любой другой машины (другой префаб, другая точка спавна) смещение получалось совершенно не тем и камера улетала далеко")]
+	public Vector3 offset = new Vector3(0f, 5f, -10f);
 	[Range(1, 10)]
 	public float followSpeed = 2;
 	[Range(1, 10)]
@@ -18,9 +20,6 @@ public class CameraFollow : MonoBehaviour {
 	public float speedThreshold = 15f; // км/ч - порог, ниже которого FOV возвращается к minFOV
 	public float fovSmooth = 3f;
 
-	Vector3 initialCameraPosition;
-	Vector3 initialCarPosition;
-	Vector3 absoluteInitCameraPosition;
 	Camera cam;
 
 	void Start(){
@@ -38,9 +37,10 @@ public class CameraFollow : MonoBehaviour {
 			return;
 		}
 
-		initialCameraPosition = gameObject.transform.position;
-		initialCarPosition = carTransform.position;
-		absoluteInitCameraPosition = initialCameraPosition - initialCarPosition;
+		// Ставим камеру на нужное место сразу, а не даём ей долетать через Lerp в FixedUpdate -
+		// иначе при спавне на другой машине (в другой точке сцены) был бы заметный "прилёт"
+		// камеры издалека в первые кадры.
+		transform.position = carTransform.position + offset;
 	}
 
 	// Ищет машину игрока среди всех зарегистрированных машин на сцене - это первая, у которой
@@ -72,7 +72,7 @@ public class CameraFollow : MonoBehaviour {
 		transform.rotation = Quaternion.Lerp(transform.rotation, _rot, lookSpeed * Time.deltaTime);
 
 		//Move to car
-		Vector3 _targetPos = absoluteInitCameraPosition + carTransform.transform.position;
+		Vector3 _targetPos = carTransform.position + offset;
 		transform.position = Vector3.Lerp(transform.position, _targetPos, followSpeed * Time.deltaTime);
 
 		//FOV in function of speed

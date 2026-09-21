@@ -18,6 +18,8 @@ public class PrometeoEditor : Editor{
   //
   private SerializedProperty isPlayerControlled;
   private SerializedProperty bodyMassCenter;
+  private SerializedProperty maxSpeed;
+  private SerializedProperty accelerationMultiplier;
   //
   //
   //WHEELS VARIABLES
@@ -74,6 +76,8 @@ public class PrometeoEditor : Editor{
 
     isPlayerControlled = SO.FindProperty("isPlayerControlled");
     bodyMassCenter = SO.FindProperty("bodyMassCenter");
+    maxSpeed = SO.FindProperty("maxSpeed");
+    accelerationMultiplier = SO.FindProperty("accelerationMultiplier");
 
     frontLeftMesh = SO.FindProperty("frontLeftMesh");
     frontLeftCollider = SO.FindProperty("frontLeftCollider");
@@ -121,7 +125,10 @@ public class PrometeoEditor : Editor{
     //
     EditorGUILayout.PropertyField(isPlayerControlled, new GUIContent("Player Controlled: "));
     GUILayout.Space(10);
-    EditorGUILayout.HelpBox("Скорость/руль/тормоза/занос настроены под геймплей и скрыты из инспектора, чтобы их случайно не открутили.", MessageType.None);
+    EditorGUILayout.PropertyField(maxSpeed, new GUIContent("Max Speed (km/h): "));
+    EditorGUILayout.PropertyField(accelerationMultiplier, new GUIContent("Acceleration Multiplier: "));
+    GUILayout.Space(10);
+    EditorGUILayout.HelpBox("Руль/тормоза/занос по-прежнему настроены под геймплей и скрыты из инспектора, чтобы их случайно не открутили.", MessageType.None);
     EditorGUILayout.PropertyField(bodyMassCenter, new GUIContent("Mass Center of Car: "));
 
     //

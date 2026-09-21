@@ -236,7 +236,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 642287924342879162}
   serializedVersion: 5
-  m_Mass: 650
+  m_Mass: 1200
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -268,9 +268,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayerControlled: 1
-  maxSpeed: 190
-  maxReverseSpeed: 120
-  accelerationMultiplier: 10
+  maxSpeed: 380
+  maxReverseSpeed: 240
+  accelerationMultiplier: 18
   maxSteeringAngle: 45
   steeringSpeed: 1
   brakeForce: 600
@@ -741,7 +741,7 @@ WheelCollider:
     m_ExtremumValue: 1
     m_AsymptoteSlip: 0.8
     m_AsymptoteValue: 0.5
-    m_Stiffness: 1
+    m_Stiffness: 2
   m_SidewaysFriction:
     m_ExtremumSlip: 0.2
     m_ExtremumValue: 1
@@ -1070,7 +1070,7 @@ WheelCollider:
     m_ExtremumValue: 1
     m_AsymptoteSlip: 0.8
     m_AsymptoteValue: 0.5
-    m_Stiffness: 1
+    m_Stiffness: 2
   m_SidewaysFriction:
     m_ExtremumSlip: 0.2
     m_ExtremumValue: 1
@@ -1270,7 +1270,7 @@ WheelCollider:
     m_ExtremumValue: 1
     m_AsymptoteSlip: 0.8
     m_AsymptoteValue: 0.5
-    m_Stiffness: 1
+    m_Stiffness: 2
   m_SidewaysFriction:
     m_ExtremumSlip: 0.2
     m_ExtremumValue: 1
@@ -7823,7 +7823,7 @@ WheelCollider:
     m_ExtremumValue: 1
     m_AsymptoteSlip: 0.8
     m_AsymptoteValue: 0.5
-    m_Stiffness: 1
+    m_Stiffness: 2
   m_SidewaysFriction:
     m_ExtremumSlip: 0.2
     m_ExtremumValue: 1
@@ -8150,11 +8150,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f36eaa818a84548931acb59456deec, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.12936
+      value: -0.14
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f36eaa818a84548931acb59456deec, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.16679
+      value: 0.23
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 75f36eaa818a84548931acb59456deec, type: 3}
       propertyPath: m_LocalRotation.w
@@ -8198,6 +8198,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3015663541277832518, guid: 75f36eaa818a84548931acb59456deec, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9055208637508625139}
+    - targetCorrespondingSourceObject: {fileID: 3015663541277832518, guid: 75f36eaa818a84548931acb59456deec, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3495981030401079404}
   m_SourcePrefab: {fileID: 100100000, guid: 75f36eaa818a84548931acb59456deec, type: 3}
 --- !u!1 &4752225410999103897 stripped
 GameObject:
@@ -8226,6 +8229,14 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -5528499478606159974, guid: 75f36eaa818a84548931acb59456deec, type: 3}
+--- !u!81 &3495981030401079404
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4752225410999103897}
+  m_Enabled: 1
 --- !u!1 &7272161142310746510 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 75f36eaa818a84548931acb59456deec, type: 3}
