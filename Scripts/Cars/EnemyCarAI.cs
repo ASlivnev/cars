@@ -451,12 +451,7 @@ public class EnemyCarAI : MonoBehaviour
 
         mineDropCooldownTimer = mineDropCooldown;
 
-        // ВРЕМЕННЫЙ диагностический лог - удалить после того, как разберёмся, почему боты не
-        // ставят мины от преследователя.
-        bool willDrop = Random.value < mineDropChance;
-        Debug.Log($"[EnemyCarAI] {gameObject.name}: обнаружен преследователь сзади, minesLeft={mineDropper.minesLeft}, монетка={(willDrop ? "ставим мину" : "пропускаем")}", this);
-
-        if(willDrop){
+        if(Random.value < mineDropChance){
             mineDropper.TryDropMine();
         }
     }
@@ -464,13 +459,8 @@ public class EnemyCarAI : MonoBehaviour
     // Ищет ЛЮБУЮ живую машину (не только currentTarget - от преследователя надо отбиваться
     // независимо от того, кого AI сейчас таранит), которая находится в узком секторе позади
     // машины и достаточно близко - именно "пристроилась в хвост", а не просто едет мимо сбоку.
-    float debugTailgateLogTimer;
-
     bool IsSomeoneTailgating()
     {
-        float bestDistance = float.MaxValue;
-        float bestAngle = float.MaxValue;
-
         foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
             if(candidate == null || candidate.transform == transform) continue;
 
@@ -485,25 +475,8 @@ public class EnemyCarAI : MonoBehaviour
 
             float angleFromBehind = Vector3.Angle(-transform.forward, toOther);
 
-            // Запоминаем ближайшего по углу кандидата - для диагностики ниже, вне зависимости
-            // от того, прошёл ли он пороги.
-            if(angleFromBehind < bestAngle){
-                bestAngle = angleFromBehind;
-                bestDistance = distance;
-            }
-
             if(distance <= tailgateCheckDistance && angleFromBehind <= tailgateAngleThreshold){
                 return true;
-            }
-        }
-
-        // ВРЕМЕННЫЙ диагностический лог (раз в секунду, чтобы не спамить) - показывает, почему
-        // ближайший потенциальный "преследователь" не проходит пороги dist/angle.
-        debugTailgateLogTimer -= Time.deltaTime;
-        if(debugTailgateLogTimer <= 0f){
-            debugTailgateLogTimer = 1f;
-            if(bestAngle < float.MaxValue){
-                Debug.Log($"[EnemyCarAI] {gameObject.name}: ближайший по углу кандидат сзади - distance={bestDistance:F1} (порог {tailgateCheckDistance}), angle={bestAngle:F1} (порог {tailgateAngleThreshold})", this);
             }
         }
 
