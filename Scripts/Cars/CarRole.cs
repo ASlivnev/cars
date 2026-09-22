@@ -24,6 +24,8 @@ public class CarRole : MonoBehaviour
     public bool enableMachineGuns = true;
     [Tooltip("Включить мины на этой машине")]
     public bool enableMines = true;
+    [Tooltip("Включить прыжок-уклонение на этой машине")]
+    public bool enableJumpBooster = true;
     [Tooltip("Объекты (например, стволы пулемётов на модели машины), которые нужно скрыть, если Enable Machine Guns выключен")]
     public GameObject[] hideWhenMachineGunsDisabled;
 
@@ -64,6 +66,11 @@ public class CarRole : MonoBehaviour
         CarMineDropper mineDropper = GetComponent<CarMineDropper>();
         if(mineDropper != null){
             mineDropper.enabled = enableMines;
+        }
+
+        CarJumpBooster jumpBooster = GetComponent<CarJumpBooster>();
+        if(jumpBooster != null){
+            jumpBooster.enabled = enableJumpBooster;
         }
 
         // useUI/carSpeedText на префабе рассчитаны на одного игрока: useUI=true, но carSpeedText

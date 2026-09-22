@@ -304,24 +304,40 @@ public class CarHealth : MonoBehaviour
 
     // Затемняет все материалы кузова (через Renderer.materials - создаёт собственную копию
     // материалов для этой машины, не портит общий ассет, которым пользуются другие машины).
+    // Раньше брался только первый MeshRenderer, поэтому glTF-модели с несколькими мешами/материалами
+    // не темнели при смерти.
     void DarkenBody()
     {
-        MeshRenderer bodyRenderer = GetComponentInChildren<MeshRenderer>();
-        if(bodyRenderer == null) return;
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach(Renderer rend in renderers){
+            // Только мешевые рендереры (не партиклы/трейлы/спрайты и т.п.).
+            if(!(rend is MeshRenderer) && !(rend is SkinnedMeshRenderer)) continue;
 
-        foreach(Material mat in bodyRenderer.materials){
-            if(mat.HasProperty("_BaseColor")){
-                Color c = mat.GetColor("_BaseColor");
-                mat.SetColor("_BaseColor", new Color(c.r * deathDarkenFactor, c.g * deathDarkenFactor, c.b * deathDarkenFactor, c.a));
-            }
-            if(mat.HasProperty("_Color")){
-                Color c = mat.GetColor("_Color");
-                mat.SetColor("_Color", new Color(c.r * deathDarkenFactor, c.g * deathDarkenFactor, c.b * deathDarkenFactor, c.a));
-            }
-            if(mat.HasProperty("_EmissionColor")){
-                mat.SetColor("_EmissionColor", Color.black);
+            foreach(Material mat in rend.materials){
+                if(mat == null) continue;
+
+                DarkenMaterialColor(mat, "_BaseColor");
+                DarkenMaterialColor(mat, "_Color");
+                DarkenMaterialColor(mat, "_BaseColorFactor");
+                DarkenMaterialColor(mat, "baseColorFactor");
+
+                if(mat.HasProperty("_EmissionColor")){
+                    mat.SetColor("_EmissionColor", Color.black);
+                }
             }
         }
+    }
+
+    void DarkenMaterialColor(Material mat, string propertyName)
+    {
+        if(!mat.HasProperty(propertyName)) return;
+
+        Color c = mat.GetColor(propertyName);
+        mat.SetColor(propertyName, new Color(
+            c.r * deathDarkenFactor,
+            c.g * deathDarkenFactor,
+            c.b * deathDarkenFactor,
+            c.a));
     }
 
     // Отрывает визуальные меши колёс от машины и раскидывает их в стороны физикой.

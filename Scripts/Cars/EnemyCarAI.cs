@@ -24,6 +24,14 @@ public class EnemyCarAI : MonoBehaviour
     [Header("Объезд препятствий")]
     public float obstacleCheckDistance = 8f;
     public float obstacleSideOffset = 1.5f;
+    [Tooltip("Угол боковых лучей для проверки прохода слева/справа (град.)")]
+    public float sideRayAngle = 35f;
+    [Tooltip("Угол, на который поворачиваем при объезде стены (град.)")]
+    public float obstacleAvoidTurnAngle = 50f;
+    [Tooltip("Время реверса, если впереди тупик (сек)")]
+    public float obstacleReverseDuration = 1.2f;
+    [Tooltip("Расстояние рейкастов для поиска свободного направления при отъезде")]
+    public float reverseCheckDistance = 6f;
     [Tooltip("Слои препятствий. По умолчанию Everything - стены обнаруживаются вне зависимости от того, на каком они слое; другие машины из объезда исключаются отдельно в коде, они не считаются препятствием")]
     public LayerMask obstacleAvoidMask = ~0;
 
@@ -106,11 +114,20 @@ public class EnemyCarAI : MonoBehaviour
     [Tooltip("Угол (град.) от направления строго назад, в пределах которого машина сзади считается преследователем (а не просто едущей мимо сбоку). 40 - довольно узкий конус: на короткой дистанции даже небольшое смещение в сторону от идеальной линии уже даёт большой угол, поэтому по умолчанию сделан шире")]
     public float tailgateAngleThreshold = 75f;
 
+    [Header("Прыжок-уклонение от столкновения")]
+    [Tooltip("Радиус, в котором учитываются другие машины при проверке 'кто-то приближается слишком быстро'")]
+    public float jumpDetectionRadius = 15f;
+    [Tooltip("Скорость сближения (км/ч) с другой машиной, выше которой AI решает подпрыгнуть, чтобы избежать столкновения")]
+    public float jumpClosingSpeedThreshold = 60f;
+    [Tooltip("Кулдаун (сек) между попытками уклонения прыжком - независимо от общего лимита прыжков у CarJumpBooster (Max Uses)")]
+    public float jumpDodgeCooldown = 2f;
+
     PrometeoCarController car;
     Rigidbody rb;
     CarMachineGuns guns;
     CarNitro nitro;
     CarMineDropper mineDropper;
+    CarJumpBooster jumpBooster;
 
     Transform currentTarget;
     Rigidbody currentTargetRb;
@@ -129,6 +146,7 @@ public class EnemyCarAI : MonoBehaviour
     float reverseCooldownTimer;
     bool isReversing;
     float reverseTimer;
+    Vector3 reverseTargetDirection;
 
     float clumpTimer;
     bool isRetreatingFromClump;
@@ -143,6 +161,8 @@ public class EnemyCarAI : MonoBehaviour
     float nitroCooldownTimer;
 
     float mineDropCooldownTimer;
+
+    float jumpDodgeCooldownTimer;
 
     // Реестр всех живых EnemyCarAI на карте - нужен, чтобы при выборе цели можно было
     // посчитать, сколько ботов уже атакует конкретную машину (см. CountAttackers).
@@ -166,6 +186,7 @@ public class EnemyCarAI : MonoBehaviour
         guns = GetComponent<CarMachineGuns>();
         nitro = GetComponent<CarNitro>();
         mineDropper = GetComponent<CarMineDropper>();
+        jumpBooster = GetComponent<CarJumpBooster>();
         baseMaxSpeed = car.GetMaxSpeed();
         lastCheckPosition = transform.position;
         PickRandomTarget();
@@ -192,6 +213,7 @@ public class EnemyCarAI : MonoBehaviour
         HandleShooting();
         HandleNitroUsage();
         HandleMineDropping();
+        HandleJumpDodge();
 
         if(isReversing){
             HandleReverse();
@@ -275,6 +297,8 @@ public class EnemyCarAI : MonoBehaviour
         Vector3 finalDirection = combinedDirection.sqrMagnitude > 0.01f
             ? AvoidObstacles(combinedDirection.normalized)
             : transform.forward;
+
+        if(isReversing) return;
 
         DriveTowards(transform.position + finalDirection * 10f);
     }
@@ -486,53 +510,182 @@ public class EnemyCarAI : MonoBehaviour
         return false;
     }
 
+    // Прыжок-уклонение - если кто-то приближается очень быстро (высокая скорость сближения, а не
+    // просто высокая скорость мимо), AI подпрыгивает, чтобы попытаться избежать столкновения.
+    // Не привязано к currentTarget - опасность может исходить от любой машины поблизости,
+    // включая ту, кого AI сам сейчас не таранит.
+    void HandleJumpDodge()
+    {
+        if(jumpBooster == null) return;
+
+        jumpDodgeCooldownTimer -= Time.deltaTime;
+        if(jumpDodgeCooldownTimer > 0f) return;
+
+        if(!IsFastApproachThreat()) return;
+
+        jumpDodgeCooldownTimer = jumpDodgeCooldown;
+        jumpBooster.TryJump();
+    }
+
+    // closingSpeed - скорость сокращения дистанции между машинами (проекция относительной
+    // скорости на направление "от угрозы к нам"). Положительное значение и есть "приближается";
+    // просто высокая скорость мимо (курсы не пересекаются) даст низкий или отрицательный
+    // closingSpeed и не вызовет прыжок.
+    bool IsFastApproachThreat()
+    {
+        foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+            if(candidate == null || candidate.transform == transform) continue;
+
+            CarHealth health = candidate.GetComponent<CarHealth>();
+            if(health != null && health.isDead) continue;
+
+            Vector3 toSelf = transform.position - candidate.transform.position;
+            toSelf.y = 0f;
+
+            float distance = toSelf.magnitude;
+            if(distance < 0.01f || distance > jumpDetectionRadius) continue;
+
+            Rigidbody otherRb = candidate.GetComponent<Rigidbody>();
+            if(otherRb == null) continue;
+
+            Vector3 relativeVelocity = otherRb.linearVelocity - rb.linearVelocity;
+            float closingSpeedKmH = Vector3.Dot(relativeVelocity, toSelf.normalized) * 3.6f;
+
+            if(closingSpeedKmH >= jumpClosingSpeedThreshold){
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Три луча (центр, слева, справа) впереди машины. Если центр упирается в препятствие -
-    // машина уходит в свободную сторону; если свободно нигде - разворот. Другие машины
-    // намеренно НЕ считаются препятствием (см. IsRealObstacle) - иначе AI сворачивал бы прочь
-    // от того, кого как раз пытается таранить.
+    // машина уходит в свободную сторону; если свободно нигде - начинает сдавать назад в
+    // наиболее свободном направлении. Другие машины намеренно НЕ считаются препятствием
+    // (см. IsRealObstacle) - иначе AI сворачивал бы прочь от той машины, которую пытается таранить.
     Vector3 AvoidObstacles(Vector3 desiredDirection)
     {
         Vector3 origin = transform.position + Vector3.up * 0.5f;
 
-        if(IsRealObstacle(origin, transform.forward)){
-            bool rightBlocked = IsRealObstacle(origin + transform.right * obstacleSideOffset, transform.forward);
-            bool leftBlocked = IsRealObstacle(origin - transform.right * obstacleSideOffset, transform.forward);
-
-            if(!rightBlocked){
-                return Quaternion.Euler(0f, 60f, 0f) * transform.forward;
-            }else if(!leftBlocked){
-                return Quaternion.Euler(0f, -60f, 0f) * transform.forward;
-            }else{
-                return Quaternion.Euler(0f, 150f, 0f) * transform.forward;
-            }
+        if(!IsRealObstacle(origin, desiredDirection)){
+            return desiredDirection;
         }
 
-        return desiredDirection;
+        // Прямой путь заблокирован - смотрим, куда можно уйти вбок.
+        Vector3 rightDir = Quaternion.Euler(0f, sideRayAngle, 0f) * transform.forward;
+        Vector3 leftDir = Quaternion.Euler(0f, -sideRayAngle, 0f) * transform.forward;
+
+        bool rightBlocked = IsRealObstacle(origin + transform.right * obstacleSideOffset, rightDir);
+        bool leftBlocked = IsRealObstacle(origin - transform.right * obstacleSideOffset, leftDir);
+
+        if(!rightBlocked && leftBlocked){
+            return Quaternion.Euler(0f, obstacleAvoidTurnAngle, 0f) * transform.forward;
+        }else if(!leftBlocked && rightBlocked){
+            return Quaternion.Euler(0f, -obstacleAvoidTurnAngle, 0f) * transform.forward;
+        }else if(!leftBlocked && !rightBlocked){
+            // Обе стороны свободны - выбираем ту, что ближе к целевому направлению.
+            float rightDot = Vector3.Dot(rightDir, desiredDirection);
+            float leftDot = Vector3.Dot(leftDir, desiredDirection);
+            float turn = rightDot >= leftDot ? obstacleAvoidTurnAngle : -obstacleAvoidTurnAngle;
+            return Quaternion.Euler(0f, turn, 0f) * transform.forward;
+        }
+
+        // Тупик: вперёд и в обе стороны заблокированы - сдаём назад в самое свободное направление.
+        if(reverseCooldownTimer <= 0f){
+            reverseTargetDirection = FindBestReverseDirection();
+            reverseTimer = obstacleReverseDuration;
+            isReversing = true;
+        }
+
+        return -transform.forward;
     }
 
     bool IsRealObstacle(Vector3 origin, Vector3 direction)
     {
-        if(!Physics.Raycast(origin, direction, out RaycastHit hit, obstacleCheckDistance, obstacleAvoidMask)){
-            return false;
+        RaycastHit[] hits = Physics.RaycastAll(origin, direction, obstacleCheckDistance, obstacleAvoidMask);
+        foreach(RaycastHit hit in hits){
+            // Столкнулись с другой машиной - это не препятствие для объезда, а потенциальная цель.
+            if(hit.collider.GetComponentInParent<PrometeoCarController>() != null) continue;
+            return true;
         }
-        // Столкнулись с другой машиной - это не препятствие для объезда, а потенциальная цель.
-        return hit.collider.GetComponentInParent<PrometeoCarController>() == null;
+        return false;
     }
 
-    // Рулит в сторону точки и решает, нужен ли ручник для резкого разворота. Газ при этом
-    // не отпускаем никогда: у машины на WheelCollider руль доворачивает корпус только пока
-    // есть движение вперёд, поэтому обнуление газа в повороте останавливает саму возможность
-    // довернуть - машина зависает с большим углом до цели и застревает на месте.
+    // Ищет наиболее свободное направление позади машины (и сбоку), чтобы отъехать от стены/застревания.
+    Vector3 FindBestReverseDirection()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        float[] angles = { 180f, 135f, -135f, 90f, -90f };
+
+        Vector3 bestDir = -transform.forward;
+        float bestDistance = 0f;
+
+        foreach(float angle in angles){
+            Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
+            float distance = ObstacleDistance(origin, dir, reverseCheckDistance);
+            if(distance > bestDistance){
+                bestDistance = distance;
+                bestDir = dir;
+            }
+        }
+
+        return bestDir;
+    }
+
+    // Расстояние до первого препятствия (не считая другие машины) по направлению.
+    float ObstacleDistance(Vector3 origin, Vector3 direction, float maxDistance)
+    {
+        RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxDistance, obstacleAvoidMask);
+        float minDistance = maxDistance;
+        foreach(RaycastHit hit in hits){
+            if(hit.collider.GetComponentInParent<PrometeoCarController>() != null) continue;
+            if(hit.distance < minDistance){
+                minDistance = hit.distance;
+            }
+        }
+        return minDistance;
+    }
+
+    // Рулит в сторону точки. Газ при этом не отпускаем: у машины на WheelCollider руль
+    // доворачивает корпус только пока есть движение вперёд, поэтому обнуление газа в
+    // повороте останавливает саму возможность довернуть - машина зависает с большим углом.
     void DriveTowards(Vector3 targetPosition)
+    {
+        SteerTowards(targetPosition);
+
+        bool fastEnoughToDrift = Mathf.Abs(car.carSpeed) > minSpeedForHandbrakeTurn;
+        bool forwardBlocked = IsRealObstacle(transform.position + Vector3.up * 0.5f, transform.forward);
+
+        // Рядом со стеной не дрифтуем ручником - машина просто врежется в стену боком.
+        if(!forwardBlocked && Mathf.Abs(GetSignedAngleTo(targetPosition)) > sharpTurnAngle && fastEnoughToDrift){
+            car.Handbrake();
+            isHandbraking = true;
+        }else if(isHandbraking){
+            car.RecoverTraction();
+            isHandbraking = false;
+        }
+
+        car.GoForward();
+    }
+
+    // Аналог DriveTowards, но движется задним ходом (без ручника).
+    void ReverseTowards(Vector3 targetPosition)
+    {
+        SteerTowards(targetPosition);
+        if(isHandbraking){
+            car.RecoverTraction();
+            isHandbraking = false;
+        }
+        car.GoReverse();
+    }
+
+    // Поворачивает руль в сторону целевой точки, не нажимая газ/тормоз/ручник.
+    void SteerTowards(Vector3 targetPosition)
     {
         Vector3 flatDirection = targetPosition - transform.position;
         flatDirection.y = 0f;
 
-        float absAngle = 0f;
         if(flatDirection.sqrMagnitude > 0.01f){
             float signedAngle = Vector3.SignedAngle(transform.forward, flatDirection, Vector3.up);
-            absAngle = Mathf.Abs(signedAngle);
-
             if(signedAngle > 3f){
                 car.TurnRight();
             }else if(signedAngle < -3f){
@@ -541,19 +694,14 @@ public class EnemyCarAI : MonoBehaviour
                 car.ResetSteeringAngle();
             }
         }
+    }
 
-        bool fastEnoughToDrift = Mathf.Abs(car.carSpeed) > minSpeedForHandbrakeTurn;
-
-        if(absAngle > sharpTurnAngle && fastEnoughToDrift){
-            car.Handbrake();
-            isHandbraking = true;
-        }else if(isHandbraking){
-            car.RecoverTraction();
-            isHandbraking = false;
-        }
-
-        // Газуем всегда, в том числе во время ручника - иначе занос не на чем будет тянуть.
-        car.GoForward();
+    float GetSignedAngleTo(Vector3 targetPosition)
+    {
+        Vector3 flatDirection = targetPosition - transform.position;
+        flatDirection.y = 0f;
+        if(flatDirection.sqrMagnitude <= 0.01f) return 0f;
+        return Vector3.SignedAngle(transform.forward, flatDirection, Vector3.up);
     }
 
     // Если текущая цель сильно оторвалась, временно поднимаем потолок скорости AI, чтобы он мог
@@ -589,11 +737,17 @@ public class EnemyCarAI : MonoBehaviour
         if(movedDistance < minMoveDistance && reverseCooldownTimer <= 0f){
             isReversing = true;
             reverseTimer = reverseDuration;
+            reverseTargetDirection = FindBestReverseDirection();
         }
     }
 
     void HandleReverse()
     {
+        SteerTowards(transform.position + reverseTargetDirection * 10f);
+        if(isHandbraking){
+            car.RecoverTraction();
+            isHandbraking = false;
+        }
         car.GoReverse();
         reverseTimer -= Time.deltaTime;
         if(reverseTimer <= 0f){
@@ -694,7 +848,14 @@ public class EnemyCarAI : MonoBehaviour
         }
 
         Vector3 finalDirection = AvoidObstacles(retreatDirection);
-        DriveTowards(transform.position + finalDirection * 10f);
+        if(isReversing) return;
+
+        Vector3 targetPoint = transform.position + finalDirection * 10f;
+        if(Vector3.Dot(transform.forward, finalDirection) < -0.2f){
+            ReverseTowards(targetPoint);
+        }else{
+            DriveTowards(targetPoint);
+        }
     }
 
     void OnDrawGizmosSelected()
