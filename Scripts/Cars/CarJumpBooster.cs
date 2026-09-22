@@ -15,6 +15,8 @@ public class CarJumpBooster : MonoBehaviour
     public float bodyHeight = 0f;
     [Tooltip("Сколько раз за игру можно прыгнуть (0 - нельзя прыгать вообще)")]
     public int maxUses = 2;
+    [Tooltip("AudioSource со звуком прыжка - с уже назначенным в инспекторе AudioClip, как и остальные звуки в проекте (nitroSound у CarNitro, fireSound у CarMachineGuns и т.д.)")]
+    [SerializeField] AudioSource jumpSound;
 
     PrometeoCarController car;
     Rigidbody rb;
@@ -80,6 +82,10 @@ public class CarJumpBooster : MonoBehaviour
         float jumpSpeed = Mathf.Sqrt(2f * gravity * targetHeight);
 
         rb.AddForce(Vector3.up * jumpSpeed, ForceMode.VelocityChange);
+
+        if(jumpSound != null){
+            jumpSound.Play();
+        }
     }
 
     // Прыгать можно только "с земли" - хотя бы одно колесо касается поверхности. Иначе машина
