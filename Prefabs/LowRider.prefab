@@ -292,9 +292,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isPlayerControlled: 1
-  maxSpeed: 190
+  maxSpeed: 210
   maxReverseSpeed: 120
-  accelerationMultiplier: 4
+  accelerationMultiplier: 6
   maxSteeringAngle: 45
   steeringSpeed: 1
   brakeForce: 600
@@ -474,7 +474,6 @@ MonoBehaviour:
   obstacleSideOffset: 1.5
   sideRayAngle: 35
   obstacleAvoidTurnAngle: 50
-  obstacleReverseDuration: 1.2
   reverseCheckDistance: 6
   obstacleAvoidMask:
     serializedVersion: 2
@@ -488,7 +487,8 @@ MonoBehaviour:
   rubberBandUpdateInterval: 1
   stuckCheckInterval: 2
   minMoveDistance: 3
-  reverseDuration: 1
+  reverseDurationMin: 1
+  reverseDurationMax: 2
   reverseCooldown: 1.5
   clumpCheckRadius: 6
   clumpMinNearbyCars: 2
@@ -527,7 +527,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CarJumpBooster
   activateKey: 114
   jumpHeightInBodies: 4
-  bodyHeight: 0
+  bodyHeight: 1
   maxUses: 2
   jumpSound: {fileID: 4666097943432456826}
 --- !u!114 &1570836716014493957

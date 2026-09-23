@@ -28,8 +28,6 @@ public class EnemyCarAI : MonoBehaviour
     public float sideRayAngle = 35f;
     [Tooltip("Угол, на который поворачиваем при объезде стены (град.)")]
     public float obstacleAvoidTurnAngle = 50f;
-    [Tooltip("Время реверса, если впереди тупик (сек)")]
-    public float obstacleReverseDuration = 1.2f;
     [Tooltip("Расстояние рейкастов для поиска свободного направления при отъезде")]
     public float reverseCheckDistance = 6f;
     [Tooltip("Слои препятствий. По умолчанию Everything - стены обнаруживаются вне зависимости от того, на каком они слое; другие машины из объезда исключаются отдельно в коде, они не считаются препятствием")]
@@ -56,10 +54,13 @@ public class EnemyCarAI : MonoBehaviour
 
     [Header("Застревание")]
     [Tooltip("Как часто проверять, насколько машина реально сместилась")]
-    public float stuckCheckInterval = 2f;
+    public float stuckCheckInterval = 1f;
     [Tooltip("Если за stuckCheckInterval машина проехала меньше этого расстояния - считаем, что застряла")]
-    public float minMoveDistance = 3f;
-    public float reverseDuration = 1f;
+    public float minMoveDistance = 1.5f;
+    [Tooltip("Минимальное время реверса при застревании (сек) - конкретное значение каждый раз случайное между Min и Max, чтобы манёвр не обрывался слишком быстро и машина реально успевала отъехать, а не дёргалась туда-сюда")]
+    public float reverseDurationMin = 1f;
+    [Tooltip("Максимальное время реверса при застревании (сек)")]
+    public float reverseDurationMax = 2f;
     [Tooltip("Пауза после реверса, прежде чем снова можно проверять застревание (чтобы не дёргаться туда-сюда)")]
     public float reverseCooldown = 1.5f;
 
@@ -168,6 +169,10 @@ public class EnemyCarAI : MonoBehaviour
     // посчитать, сколько ботов уже атакует конкретную машину (см. CountAttackers).
     static readonly List<EnemyCarAI> AllEnemies = new List<EnemyCarAI>();
 
+    // Режим "все против игрока" - выставляется GameManager'ом в его Awake() по галочке в
+    // инспекторе. Общий на всех ботов (один переключатель на игру), поэтому статический.
+    public static bool AllAgainstPlayer = false;
+
     void OnEnable()
     {
         AllEnemies.Add(this);
@@ -240,6 +245,11 @@ public class EnemyCarAI : MonoBehaviour
     {
         retargetTimer = retargetInterval;
 
+        if(AllAgainstPlayer){
+            PickPlayerTarget();
+            return;
+        }
+
         List<PrometeoCarController> candidates = new List<PrometeoCarController>();
         foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
             if(candidate == null || candidate == car) continue;
@@ -264,6 +274,31 @@ public class EnemyCarAI : MonoBehaviour
         PrometeoCarController chosen = pool[Random.Range(0, pool.Count)];
         currentTarget = chosen.transform;
         currentTargetRb = chosen.GetComponent<Rigidbody>();
+    }
+
+    // Режим "все против игрока" (см. AllAgainstPlayer) - других ботов вообще не рассматриваем
+    // как цель, ищем именно машину с CarRole.isPlayer == true (та же логика, что и в
+    // GameManager.FindPlayerHealth/CameraFollow.FindPlayerCar).
+    void PickPlayerTarget()
+    {
+        foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+            if(candidate == null || candidate == car) continue;
+
+            CarHealth health = candidate.GetComponent<CarHealth>();
+            if(health != null && health.isDead) continue;
+
+            CarRole role = candidate.GetComponent<CarRole>();
+            if(role == null || !role.isPlayer) continue;
+
+            currentTarget = candidate.transform;
+            currentTargetRb = candidate.GetComponent<Rigidbody>();
+            return;
+        }
+
+        // Игрок мёртв или не найден на сцене - цели нет (к этому моменту игра, скорее всего,
+        // уже завершена через GameManager).
+        currentTarget = null;
+        currentTargetRb = null;
     }
 
     int CountAttackers(Transform target)
@@ -497,6 +532,11 @@ public class EnemyCarAI : MonoBehaviour
         if(!IsFastApproachThreat()) return;
 
         jumpDodgeCooldownTimer = jumpDodgeCooldown;
+
+        // ВРЕМЕННЫЙ диагностический лог - удалить после того, как разберёмся, почему LowRider
+        // топчется на месте в роли противника.
+        Debug.Log($"[EnemyCarAI] {gameObject.name}: HandleJumpDodge вызывает TryJump()", this);
+
         jumpBooster.TryJump();
     }
 
@@ -565,7 +605,7 @@ public class EnemyCarAI : MonoBehaviour
         // Тупик: вперёд и в обе стороны заблокированы - сдаём назад в самое свободное направление.
         if(reverseCooldownTimer <= 0f){
             reverseTargetDirection = FindBestReverseDirection();
-            reverseTimer = obstacleReverseDuration;
+            reverseTimer = Random.Range(reverseDurationMin, reverseDurationMax);
             isReversing = true;
         }
 
@@ -604,18 +644,17 @@ public class EnemyCarAI : MonoBehaviour
         return bestDir;
     }
 
-    // Расстояние до первого препятствия (не считая другие машины) по направлению.
+    // Расстояние до первого препятствия по направлению - в отличие от IsRealObstacle (объезд на
+    // подъезде к цели), здесь другие машины СЧИТАЮТСЯ препятствием. Если застревание вызвано тем,
+    // что машины "слиплись" вплотную друг к другу, для отъезда нужно искать направление, реально
+    // свободное от других машин, а не только от стен - иначе можно "отъехать" прямо в ту же машину,
+    // в которую уже упирались.
     float ObstacleDistance(Vector3 origin, Vector3 direction, float maxDistance)
     {
-        RaycastHit[] hits = Physics.RaycastAll(origin, direction, maxDistance, obstacleAvoidMask);
-        float minDistance = maxDistance;
-        foreach(RaycastHit hit in hits){
-            if(hit.collider.GetComponentInParent<PrometeoCarController>() != null) continue;
-            if(hit.distance < minDistance){
-                minDistance = hit.distance;
-            }
+        if(Physics.Raycast(origin, direction, out RaycastHit hit, maxDistance, obstacleAvoidMask)){
+            return hit.distance;
         }
-        return minDistance;
+        return maxDistance;
     }
 
     // Рулит в сторону точки. Газ при этом не отпускаем: у машины на WheelCollider руль
@@ -707,10 +746,15 @@ public class EnemyCarAI : MonoBehaviour
         lastCheckPosition = transform.position;
         stuckCheckTimer = 0f;
 
+        // ВРЕМЕННЫЙ диагностический лог - удалить после того, как разберёмся, почему LowRider
+        // топчется на месте в роли противника.
+        Debug.Log($"[EnemyCarAI] {gameObject.name}: CheckIfStuck movedDistance={movedDistance:F2} (порог {minMoveDistance}), reverseCooldownTimer={reverseCooldownTimer:F2}, isReversing={isReversing}", this);
+
         if(movedDistance < minMoveDistance && reverseCooldownTimer <= 0f){
             isReversing = true;
-            reverseTimer = reverseDuration;
+            reverseTimer = Random.Range(reverseDurationMin, reverseDurationMax);
             reverseTargetDirection = FindBestReverseDirection();
+            Debug.Log($"[EnemyCarAI] {gameObject.name}: START REVERSE, reverseTimer={reverseTimer:F2}, direction={reverseTargetDirection}", this);
         }
     }
 
@@ -774,6 +818,52 @@ public class EnemyCarAI : MonoBehaviour
         retreatManeuverTimer = clumpRetreatTimeout;
         retreatStartPosition = transform.position;
         retreatDirection = ComputeRetreatDirection();
+
+        // Обычный PickRandomTarget() не учитывает дистанцию - мог бы снова выбрать кого-то
+        // из той же кучи, и после отъезда бот тут же вернулся бы обратно в то же скопление.
+        // Явно берём самую ДАЛЬНЮЮ живую цель - это уводит бота в сторону от толпы, а не по
+        // кругу в то же место.
+        PickFarTarget();
+    }
+
+    // См. комментарий в StartRetreatFromClump() - выбирает самую дальнюю живую машину, а не
+    // случайную, как обычный PickRandomTarget().
+    void PickFarTarget()
+    {
+        retargetTimer = retargetInterval;
+
+        // В режиме "все против игрока" цель всегда одна - сам игрок, "дальняя цель" тут не имеет
+        // смысла (менять её на другого бота было бы нарушением режима). Сам отъезд от кучи
+        // (retreatDirection) уже физически уводит машину в сторону - этого достаточно.
+        if(AllAgainstPlayer){
+            PickPlayerTarget();
+            return;
+        }
+
+        PrometeoCarController best = null;
+        float bestDistance = -1f;
+
+        foreach(PrometeoCarController candidate in PrometeoCarController.AllCars){
+            if(candidate == null || candidate == car) continue;
+
+            CarHealth health = candidate.GetComponent<CarHealth>();
+            if(health != null && health.isDead) continue;
+
+            float distance = Vector3.Distance(transform.position, candidate.transform.position);
+            if(distance > bestDistance){
+                bestDistance = distance;
+                best = candidate;
+            }
+        }
+
+        if(best == null){
+            currentTarget = null;
+            currentTargetRb = null;
+            return;
+        }
+
+        currentTarget = best.transform;
+        currentTargetRb = best.GetComponent<Rigidbody>();
     }
 
     // Направление - прочь от СРЕДНЕЙ точки соседних машин, а не просто назад: если куча

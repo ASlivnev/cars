@@ -20,9 +20,21 @@ public class GameManager : MonoBehaviour
     [Tooltip("Как часто (сек) проверять, не уничтожены ли уже все противники")]
     public float winCheckInterval = 0.5f;
 
+    [Header("Режим игры")]
+    [Tooltip("Включено - все противники атакуют только игрока. Выключено - обычный режим \"все против всех\", противники таранят и друг друга тоже")]
+    public bool allAgainstPlayer = false;
+
     bool isGameOver;
     float winCheckTimer;
     List<CarHealth> trackedEnemies;
+
+    void Awake()
+    {
+        // В Awake(), а не в Start() - Unity гарантированно вызывает все Awake() на сцене раньше
+        // любого Start(), а EnemyCarAI уже в своём Start() выбирает первую цель. Если выставить
+        // флаг позже, первые ~retargetInterval секунд боты играли бы в старом режиме.
+        EnemyCarAI.AllAgainstPlayer = allAgainstPlayer;
+    }
 
     void Start()
     {

@@ -81,6 +81,10 @@ public class CarJumpBooster : MonoBehaviour
         float gravity = Mathf.Abs(Physics.gravity.y);
         float jumpSpeed = Mathf.Sqrt(2f * gravity * targetHeight);
 
+        // ВРЕМЕННЫЙ диагностический лог - удалить после того, как разберёмся, почему LowRider
+        // топчется на месте в роли противника.
+        Debug.Log($"[CarJumpBooster] {gameObject.name}: ПРЫЖОК выполнен, bodyHeight={bodyHeight:F2}, targetHeight={targetHeight:F2}, jumpSpeed={jumpSpeed:F2}, usesLeft={usesLeft}", this);
+
         rb.AddForce(Vector3.up * jumpSpeed, ForceMode.VelocityChange);
 
         if(jumpSound != null){
